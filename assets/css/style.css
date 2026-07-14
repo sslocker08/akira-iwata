@@ -126,6 +126,7 @@ html[data-act="night"] .bg__night { opacity: 1; }
 .act__head {
   display: flex;
   align-items: flex-end;
+  gap: clamp(0.6rem, 1.4vw, 1.25rem);
   padding-block: var(--s-5) var(--s-3);
 }
 .maku-title {
@@ -141,6 +142,20 @@ html[data-act="night"] .bg__night { opacity: 1; }
   font-feature-settings: "tnum" 1;
 }
 .maku-title .ch { display: inline-block; }
+
+/* 章題わきの和文サブラベル（明朝の大題に対し、ゴシック小字で対比） */
+.maku-sub {
+  writing-mode: vertical-rl;
+  font-family: var(--font-ui);
+  font-size: clamp(0.8125rem, 0.72rem + 0.42vw, 1.1rem);
+  font-weight: 500;
+  letter-spacing: 0.32em;
+  line-height: 1;
+  color: var(--sumi-soft);
+  align-self: flex-start;
+  padding-block-start: 0.35em;
+}
+[data-theme="night"] .maku-sub { color: var(--night-soft); }
 
 /* ---------- 行充填ギャラリー（justified rows） ---------- */
 .row {
