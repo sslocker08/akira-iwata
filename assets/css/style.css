@@ -305,14 +305,10 @@ html.js .bleed-photo--cover img { will-change: transform; }
   display: grid;
   grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
   gap: var(--s-4);
-  align-items: stretch;
+  align-items: start;
   margin-block-end: var(--gap);
 }
-.shirusu__photo button, .shirusu__photo img { height: 100%; }
-.shirusu__photo img {
-  object-fit: cover;
-  object-position: 0% 50%;
-}
+.shirusu__photo img { width: 100%; height: auto; }
 .shirusu h3 {
   font-family: var(--font-display);
   font-weight: 600;
@@ -538,7 +534,6 @@ html.js .maku-title.is-in .ch {
   .hyoshi__title-block { justify-self: end; height: min(52svh, 24rem); }
   .hyoshi__art { order: 2; }
   .shirusu__grid { grid-template-columns: minmax(0, 1fr); }
-  .shirusu__photo img { aspect-ratio: 3 / 2; height: auto; }
   .byobu { block-size: 320px; }
   .bleed-photo--cover img { height: 72svh; }
   .kura__grid { grid-template-columns: repeat(auto-fill, minmax(min(80px, 100%), 1fr)); }
