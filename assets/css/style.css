@@ -1,0 +1,595 @@
+@charset "UTF-8";
+/* ============================================================
+   岩田暉良 作品集
+   マクロ構造: ジャスティファイド・ロウ（行充填）の密な図録。
+   幕の変わり目のみフルブリードが破る。二幕（紙→夜→紙）。
+   規律: 色・字体は全てトークン経由 / アニメは transform・opacity のみ
+   critique: Philosophy 5 / Hierarchy 4 / Execution 4 / Specificity 5 / Restraint 4 / Variety 4
+   ============================================================ */
+
+/* ---------- tokens ---------- */
+:root {
+  /* 紙の幕 */
+  --washi:       oklch(0.965 0.008 95);
+  --washi-shade: oklch(0.932 0.012 95);
+  --sumi:        oklch(0.240 0.010 80);
+  --sumi-soft:   oklch(0.240 0.010 80 / 0.72);
+  --sumi-faint:  oklch(0.240 0.010 80 / 0.16);
+  --shu:         oklch(0.560 0.205 31);
+  --kin:         oklch(0.760 0.115 88);
+
+  /* 夜の幕 */
+  --night-bg:    oklch(0.145 0.015 285);
+  --night-shade: oklch(0.195 0.015 285);
+  --night-ink:   oklch(0.920 0.012 95);
+  --night-soft:  oklch(0.920 0.012 95 / 0.68);
+  --night-faint: oklch(0.920 0.012 95 / 0.18);
+  --shu-bright:  oklch(0.635 0.215 33);
+
+  /* 字体（システムのみ・ネットワークゼロ） */
+  --font-display: "Hiragino Mincho ProN", "Hiragino Mincho Pro", "YuMincho", "Yu Mincho", "Noto Serif JP", serif;
+  --font-ui: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "YuGothic", "Noto Sans JP", sans-serif;
+
+  /* 級数 */
+  --fs-display: clamp(3.2rem, 2rem + 6.5vw, 7rem);
+  --fs-maku:    clamp(2.6rem, 1.8rem + 4vw, 5.5rem);
+  --fs-h2:      clamp(1.35rem, 1.1rem + 1.2vw, 2rem);
+  --fs-body:    clamp(1rem, 0.94rem + 0.3vw, 1.125rem);
+  --fs-caption: 0.8125rem;
+  --fs-fig:     0.75rem;
+
+  --lh-body: 1.9;
+  --ls-body: 0.04em;
+  --ls-fig:  0.14em;
+
+  /* 余白（密） */
+  --gap: clamp(4px, 0.55vw, 9px);
+  --s-1: 0.25rem; --s-2: 0.5rem; --s-3: 1rem; --s-4: 1.5rem;
+  --s-5: 2.5rem;  --s-6: 4rem;
+
+  --w-spine: 100rem;
+
+  /* モーション */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-reveal: 640ms;
+  --dur-akaten: 1300ms;
+}
+
+/* ---------- base ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  overflow-x: clip;
+  background: var(--washi);
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  letter-spacing: var(--ls-body);
+  color: var(--sumi);
+  -webkit-font-smoothing: antialiased;
+}
+
+img { max-width: 100%; height: auto; display: block; }
+
+h1, h2, h3, p, figure, figcaption { margin: 0; font-style: normal; }
+
+::selection { background: var(--shu); color: var(--washi); }
+
+:focus-visible {
+  outline: 2px solid var(--shu);
+  outline-offset: 3px;
+  transition: none;
+}
+[data-theme="night"] :focus-visible { outline-color: var(--kin); }
+
+/* ---------- 固定二層背景（暗転の機構） ---------- */
+.bg { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+.bg__paper, .bg__night { position: absolute; inset: 0; }
+.bg__paper { background: var(--washi); }
+.bg__paper::after {
+  content: "";
+  position: absolute; inset: 0;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240"><filter id="p"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter><rect width="240" height="240" filter="url(%23p)" opacity="0.55"/></svg>');
+  background-size: 240px 240px;
+  opacity: 0.05;
+}
+.bg__night {
+  background: var(--night-bg);
+  opacity: 0;
+  transition: opacity var(--dur-akaten) var(--ease-out);
+  will-change: opacity;
+}
+html[data-act="night"] .bg__night { opacity: 1; }
+
+/* ---------- スパイン ---------- */
+.spine {
+  max-width: var(--w-spine);
+  margin-inline: auto;
+  padding-inline: clamp(0.5rem, 1.5vw, 1.5rem);
+}
+
+/* フルブリード */
+.bleed {
+  width: 100vw;
+  margin-inline: calc(50% - 50vw);
+}
+
+/* ---------- 章 ---------- */
+.act { padding-block: var(--gap); position: relative; }
+.act[data-theme="night"] { color: var(--night-ink); }
+
+.act__head {
+  display: flex;
+  align-items: flex-end;
+  padding-block: var(--s-5) var(--s-3);
+}
+.maku-title {
+  writing-mode: vertical-rl;
+  text-orientation: mixed; /* 欧文は横倒し */
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--fs-maku);
+  line-height: 1;
+  letter-spacing: 0.06em;
+  max-height: 60svh;
+  color: currentColor;
+  font-feature-settings: "tnum" 1;
+}
+.maku-title .ch { display: inline-block; }
+
+/* ---------- 行充填ギャラリー（justified rows） ---------- */
+.row {
+  display: flex;
+  gap: var(--gap);
+  margin-block-end: var(--gap);
+}
+.row .plate {
+  flex: var(--ar) 1 0%;
+  min-width: 0;
+}
+.row .plate img { width: 100%; height: auto; }
+
+/* ---------- 図版 ---------- */
+.plate { position: relative; }
+.plate img { background: var(--washi-shade); }
+[data-theme="night"] .plate img { background: var(--night-shade); }
+
+/* 番号は画像上にホバー/フォーカスで浮く（帯を作らない） */
+.plate figcaption {
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block-end: 0;
+  padding: 0.15rem 0.5rem;
+  background: oklch(0.965 0.008 95 / 0.85);
+  opacity: 0;
+  transition: opacity 180ms var(--ease-out);
+  pointer-events: none;
+}
+.plate:hover figcaption,
+.plate:focus-within figcaption { opacity: 1; }
+
+.fig-no {
+  font-family: var(--font-ui);
+  font-size: var(--fs-fig);
+  letter-spacing: var(--ls-fig);
+  color: var(--shu);
+  white-space: nowrap;
+  font-feature-settings: "tnum" 1;
+}
+[data-theme="night"] .fig-no { color: var(--shu-bright); }
+
+.plate button {
+  all: unset;
+  display: block;
+  width: 100%;
+  cursor: zoom-in;
+}
+.plate button:hover img { opacity: 0.94; }
+.plate button:active img { opacity: 0.8; }
+.plate button:focus-visible { outline: 2px solid var(--shu); outline-offset: -2px; }
+[data-theme="night"] .plate button:focus-visible { outline-color: var(--kin); }
+/* transformはパララックスが専有するため遷移はopacityのみ */
+.plate button img { transition: opacity 200ms var(--ease-out); }
+
+/* ---------- パララックス ---------- */
+html.js [data-px] { will-change: transform; }
+html.js .bleed-photo--cover button { overflow: clip; display: block; }
+html.js .bleed-photo--cover img { will-change: transform; }
+
+/* ---------- 表紙 ---------- */
+.hyoshi {
+  min-height: 100svh;
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: var(--s-4);
+  align-items: center;
+  padding-block: var(--s-4);
+}
+.hyoshi__art { align-self: end; }
+.hyoshi__title-block {
+  justify-self: end;
+  display: flex;
+  flex-direction: row-reverse;
+  gap: var(--s-4);
+  align-items: flex-start;
+  height: min(72svh, 40rem);
+}
+.hyoshi__title {
+  writing-mode: vertical-rl;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--fs-display);
+  letter-spacing: 0.14em;
+  line-height: 1;
+}
+.hyoshi__sub {
+  writing-mode: vertical-rl;
+  font-size: var(--fs-fig);
+  letter-spacing: var(--ls-fig);
+  color: var(--sumi-soft);
+  padding-block-start: 0.4rem;
+}
+
+/* ---------- フルブリード図版 ---------- */
+.bleed-photo { margin-block: var(--gap); position: relative; }
+.bleed-photo img { width: 100%; }
+.bleed-photo--cover img { height: 100svh; object-fit: cover; }
+.bleed-photo--cover figcaption {
+  background: none;
+}
+.bleed-photo--cover .fig-no { color: var(--shu-bright); }
+
+/* ---------- 屏風 ---------- */
+.byobu {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  block-size: clamp(320px, 74vh, 780px);
+  background: var(--washi-shade);
+}
+.byobu__inner {
+  position: relative;
+  block-size: 100%;
+  aspect-ratio: 3501 / 1197;
+}
+.byobu__inner img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.byobu__folds {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    90deg,
+    oklch(0.2 0.01 80 / 0.07) 0,
+    transparent 1.2%,
+    transparent 15.4%,
+    oklch(1 0 0 / 0.05) 16.55%,
+    oklch(0.2 0.01 80 / 0.07) 16.6667%
+  );
+}
+.byobu-wrap { position: relative; margin-block-end: var(--gap); }
+.byobu-hint {
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block-end: 0;
+  padding: 0.15rem 0.5rem;
+  background: oklch(0.965 0.008 95 / 0.85);
+  font-size: var(--fs-fig);
+  letter-spacing: var(--ls-fig);
+  color: var(--sumi-soft);
+  display: flex;
+  gap: var(--s-2);
+}
+
+/* ---------- 幕間（暗転ステージ） ---------- */
+.kure {
+  block-size: 180svh;
+  position: relative;
+  margin-block: var(--gap);
+}
+.kure__zone {
+  position: absolute;
+  inset-inline: 0;
+  pointer-events: none;
+}
+.kure__zone--paper { inset-block-start: 0; block-size: 62%; }
+.kure__zone--night { inset-block-start: 62%; block-size: 38%; }
+.kure__s { position: absolute; inset-inline: 0; block-size: 1px; pointer-events: none; }
+.kure__s--1 { inset-block-start: 36%; }
+.kure__s--2 { inset-block-start: 62%; }
+.kure__stage {
+  position: sticky;
+  top: 0;
+  block-size: 100svh;
+  overflow: clip;
+}
+.kure__stage img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.06);
+  transition: transform 1400ms var(--ease-out);
+}
+.kure.is-seen .kure__stage img { transform: scale(1); }
+.kure__veil {
+  position: absolute;
+  inset: 0;
+  background: var(--night-bg);
+  opacity: 0;
+  transition: opacity 900ms var(--ease-out);
+  will-change: opacity;
+}
+.kure[data-phase="1"] .kure__veil { opacity: 0.45; }
+.kure[data-phase="2"] .kure__veil { opacity: 0.82; }
+
+/* ---------- 記（About） ---------- */
+.shirusu__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: var(--s-4);
+  align-items: stretch;
+  margin-block-end: var(--gap);
+}
+.shirusu__photo button, .shirusu__photo img { height: 100%; }
+.shirusu__photo img {
+  object-fit: cover;
+  object-position: 0% 50%;
+}
+.shirusu h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--fs-h2);
+  letter-spacing: 0.12em;
+  margin-block: var(--s-4) var(--s-2);
+}
+.shirusu h3:first-of-type { margin-block-start: 0; }
+.shirusu h3 small {
+  font-family: var(--font-ui);
+  font-weight: 400;
+  font-size: var(--fs-fig);
+  letter-spacing: var(--ls-fig);
+  color: var(--sumi-soft);
+  margin-inline-start: var(--s-2);
+}
+.shirusu ul { list-style: none; margin: 0; padding: 0; }
+.shirusu li {
+  padding-block: var(--s-1);
+  border-block-end: 1px solid var(--sumi-faint);
+  display: flex;
+  gap: var(--s-4);
+  align-items: baseline;
+}
+.shirusu li b {
+  font-family: var(--font-ui);
+  font-weight: 400;
+  font-size: var(--fs-fig);
+  letter-spacing: var(--ls-fig);
+  color: var(--sumi-soft);
+  min-inline-size: 3.5rem;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ---------- 蔵（収蔵庫） ---------- */
+.kura { content-visibility: auto; contain-intrinsic-size: auto 2200px; }
+.kura__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(110px, 100%), 1fr));
+  gap: var(--gap);
+}
+.kura__cell {
+  all: unset;
+  position: relative;
+  aspect-ratio: 1;
+  cursor: zoom-in;
+  overflow: clip;
+}
+.kura__cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.88;
+  transition: opacity 180ms var(--ease-out);
+  background: var(--washi-shade);
+}
+.kura__cell:hover img { opacity: 1; }
+.kura__cell:active img { opacity: 0.75; }
+.kura__cell:focus-visible { outline: 2px solid var(--shu); outline-offset: -2px; }
+.kura__no {
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block-end: 0;
+  font-family: var(--font-ui);
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  padding: 0.1rem 0.35rem;
+  background: oklch(0.965 0.008 95 / 0.85);
+  color: var(--sumi);
+  opacity: 0;
+  transition: opacity 180ms var(--ease-out);
+  font-feature-settings: "tnum" 1;
+}
+.kura__cell:hover .kura__no,
+.kura__cell:focus-visible .kura__no { opacity: 1; }
+
+/* ---------- 奥付 ---------- */
+.okuzuke {
+  padding-block: var(--s-5);
+  text-align: center;
+  font-size: var(--fs-caption);
+  letter-spacing: 0.18em;
+  color: var(--sumi-soft);
+}
+
+/* ---------- 索引ナビ ---------- */
+.nav {
+  position: fixed;
+  right: clamp(0.5rem, 1.5vw, 1.5rem);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  text-align: center;
+}
+.nav a {
+  font-family: var(--font-display);
+  font-size: 0.8125rem;
+  font-feature-settings: "tnum" 1;
+  text-decoration: none;
+  color: var(--sumi-soft);
+  padding: var(--s-1) var(--s-2);
+}
+.nav a:hover { color: var(--shu); }
+.nav a:active { transform: translateY(1px); }
+.nav a:focus-visible { outline: 2px solid var(--shu); outline-offset: 2px; }
+html[data-act="night"] .nav a { color: var(--night-soft); }
+html[data-act="night"] .nav a:hover { color: var(--shu-bright); }
+html[data-act="night"] .nav a:focus-visible { outline-color: var(--kin); }
+
+/* ---------- ライトボックス ---------- */
+.lb {
+  border: none;
+  padding: 0;
+  background: transparent;
+  max-inline-size: 100vw;
+  max-block-size: 100svh;
+  inline-size: 100vw;
+  block-size: 100svh;
+  overscroll-behavior: contain;
+}
+.lb::backdrop { background: oklch(0.1 0.012 285 / 0.94); }
+.lb__stage {
+  position: relative;
+  inline-size: 100%;
+  block-size: 100%;
+  display: grid;
+  place-items: center;
+}
+.lb__img {
+  max-inline-size: min(94vw, 1800px);
+  max-block-size: 86svh;
+  inline-size: auto;
+  height: auto;
+  object-fit: contain;
+  background: var(--night-shade);
+  transition: opacity 220ms var(--ease-out);
+}
+.lb__img.is-switching { opacity: 0; }
+.lb__caption {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: max(0.75rem, env(safe-area-inset-bottom));
+  text-align: center;
+  color: var(--night-soft);
+  font-size: var(--fs-caption);
+  letter-spacing: 0.06em;
+}
+.lb button {
+  all: unset;
+  position: absolute;
+  cursor: pointer;
+  color: var(--night-ink);
+  font-family: var(--font-ui);
+  font-size: 1.4rem;
+  line-height: 1;
+  padding: var(--s-3);
+  opacity: 0.75;
+  transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
+}
+.lb button:hover { opacity: 1; }
+.lb button:active { transform: scale(0.94); }
+.lb button:focus-visible { outline: 2px solid var(--kin); outline-offset: 2px; opacity: 1; }
+.lb__close { inset-block-start: max(0.75rem, env(safe-area-inset-top)); inset-inline-end: 0.75rem; }
+.lb__prev { inset-inline-start: 0.5rem; inset-block-start: 50%; transform: translateY(-50%); }
+.lb__next { inset-inline-end: 0.5rem; inset-block-start: 50%; transform: translateY(-50%); }
+.lb__prev:active { transform: translateY(-50%) scale(0.94); }
+.lb__next:active { transform: translateY(-50%) scale(0.94); }
+
+/* ---------- 欠図（unhappy path） ---------- */
+.plate.is-missing img, .kura__cell.is-missing img { visibility: hidden; }
+.plate.is-missing::before, .kura__cell.is-missing::before {
+  content: "欠";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: var(--fs-h2);
+  color: var(--sumi-faint);
+  background: var(--washi-shade);
+  border: 1px dashed var(--sumi-faint);
+}
+[data-theme="night"] .plate.is-missing::before {
+  background: var(--night-shade);
+  border-color: var(--night-faint);
+  color: var(--night-faint);
+}
+
+/* ---------- リビール（JS有効時のみ隠す） ---------- */
+html.js [data-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 24px, 0);
+}
+html.js [data-reveal].is-in {
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--dur-reveal) var(--ease-out), transform var(--dur-reveal) var(--ease-out);
+  transition-delay: calc(var(--stagger, 0) * 80ms);
+}
+html.js .maku-title .ch {
+  opacity: 0;
+  transform: translate3d(0, 0.5em, 0) rotate(3deg);
+  transform-origin: left bottom;
+}
+html.js .maku-title.is-in .ch {
+  opacity: 1;
+  transform: none;
+  transition: opacity 700ms var(--ease-out), transform 700ms var(--ease-out);
+  transition-delay: calc(var(--i, 0) * 90ms);
+}
+
+/* ---------- レスポンシブ ---------- */
+@media (max-width: 767px) {
+  .nav { display: none; }
+  .hyoshi { grid-template-columns: minmax(0, 1fr); }
+  .hyoshi__title-block { justify-self: end; height: min(52svh, 24rem); }
+  .hyoshi__art { order: 2; }
+  .shirusu__grid { grid-template-columns: minmax(0, 1fr); }
+  .shirusu__photo img { aspect-ratio: 3 / 2; height: auto; }
+  .byobu { block-size: 320px; }
+  .bleed-photo--cover img { height: 72svh; }
+  .kura__grid { grid-template-columns: repeat(auto-fill, minmax(min(80px, 100%), 1fr)); }
+}
+
+/* 極小幅: 行を縦積みに畳む（密な単列フィード） */
+@media (max-width: 560px) {
+  .row { display: block; }
+  .row .plate { margin-block-end: var(--gap); }
+  .row .plate:last-child { margin-block-end: 0; }
+}
+
+/* ---------- reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  html.js [data-reveal] { transform: none; }
+  html.js [data-reveal].is-in { transition: opacity 150ms linear; transition-delay: 0ms; }
+  html.js .maku-title .ch { transform: none; }
+  html.js .maku-title.is-in .ch { transition: opacity 150ms linear; transition-delay: 0ms; }
+  .bg__night { transition-duration: 150ms; }
+  .kure__stage img { transform: none; transition: none; }
+  .kure__veil { transition-duration: 150ms; }
+  .plate button img, .kura__cell img, .lb__img { transition: none; }
+  html.js [data-px], html.js .bleed-photo--cover img { will-change: auto; }
+}
