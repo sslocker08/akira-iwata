@@ -84,11 +84,7 @@
       img.width = 400;
       img.height = Math.round(400 * w.h / w.w);
       img.style.background = w.color;
-      var label = document.createElement("span");
-      label.className = "kura__no";
-      label.textContent = no;
       cell.appendChild(img);
-      cell.appendChild(label);
       frag.appendChild(cell);
     });
     kuraGrid.appendChild(frag);
@@ -107,7 +103,6 @@
   var lb = document.querySelector(".lb");
   if (lb && typeof WORKS !== "undefined") {
     var lbImg = lb.querySelector(".lb__img");
-    var lbCap = lb.querySelector(".lb__caption");
     var btnClose = lb.querySelector(".lb__close");
     var btnPrev = lb.querySelector(".lb__prev");
     var btnNext = lb.querySelector(".lb__next");
@@ -134,11 +129,6 @@
         lbImg.classList.remove("is-switching");
       };
       next.src = srcOf(w);
-      lbCap.innerHTML = "";
-      var noEl = document.createElement("span");
-      noEl.className = "fig-no";
-      noEl.textContent = "No." + String(current + 1).padStart(3, "0");
-      lbCap.appendChild(noEl);
       /* 隣接±1のみ先読み */
       [current - 1, current + 1].forEach(function (j) {
         var p = new Image();
@@ -149,18 +139,23 @@
     var open = function (id, openerEl) {
       opener = openerEl || null;
       docEl.style.overflow = "hidden";
+      docEl.classList.add("lb-open");
       lb.showModal();
       show(indexOf[id] != null ? indexOf[id] : 0);
     };
 
     var unlock = function () {
       docEl.style.removeProperty("overflow");
+      docEl.classList.remove("lb-open");
       lbImg.removeAttribute("src");
       if (opener && document.contains(opener)) opener.focus();
       opener = null;
     };
     lb.addEventListener("close", unlock);
-    lb.addEventListener("cancel", function () { docEl.style.removeProperty("overflow"); });
+    lb.addEventListener("cancel", function () {
+      docEl.style.removeProperty("overflow");
+      docEl.classList.remove("lb-open");
+    });
 
     /* バックドロップクリックで閉じる */
     lb.addEventListener("click", function (e) {
