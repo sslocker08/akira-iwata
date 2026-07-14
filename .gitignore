@@ -1,3 +1,8 @@
 .DS_Store
 image/
-tools/
+# 初期セットアップ用の一度きりスクリプト（手元のみ・本番不要）
+tools/_bootstrap_site_json.mjs
+tools/build_data.py
+tools/build_images.sh
+tools/organize_images.sh
+tools/probe.html
