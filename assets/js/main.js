@@ -37,10 +37,14 @@
   });
 
   /* ---------- 幕ゾーン（紙⇄夜） ---------- */
+  var kure = document.getElementById("kure");
   var zoneIO = new IntersectionObserver(function (entries) {
     entries.forEach(function (e) {
-      if (e.isIntersecting) {
-        docEl.dataset.act = e.target.dataset.actzone;
+      if (!e.isIntersecting) return;
+      docEl.dataset.act = e.target.dataset.actzone;
+      /* 幕間のヴェール段階のフォールバック（reduced-motion時はこれが正） */
+      if (kure && e.target.parentElement === kure) {
+        kure.dataset.phase = e.target.dataset.actzone === "night" ? "2" : "1";
       }
     });
   }, CENTER_BAND);
@@ -48,8 +52,7 @@
     zoneIO.observe(el);
   });
 
-  /* ---------- 幕間 暮: 段階演出 ---------- */
-  var kure = document.getElementById("kure");
+  /* ---------- 幕間 暮: 出現ズーム ---------- */
   if (kure) {
     var seenIO = new IntersectionObserver(function (entries) {
       entries.forEach(function (e) {
@@ -60,20 +63,6 @@
       });
     }, { threshold: 0.05 });
     seenIO.observe(kure);
-
-    var passed = { s1: false, s2: false };
-    var updatePhase = function () {
-      kure.dataset.phase = passed.s2 ? "2" : (passed.s1 ? "1" : "0");
-    };
-    var phaseIO = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) {
-        var key = e.target.classList.contains("kure__s--1") ? "s1" : "s2";
-        passed[key] = e.isIntersecting || e.boundingClientRect.top < 0;
-      });
-      updatePhase();
-    }, CENTER_BAND);
-    kure.querySelectorAll(".kure__s").forEach(function (el) { phaseIO.observe(el); });
-    updatePhase();
   }
 
   /* ---------- 収蔵庫グリッド生成（WORKS: data.js） ---------- */
@@ -223,14 +212,20 @@
     document.querySelectorAll(".bleed-photo--cover img").forEach(function (img) {
       targets.push({ el: img, depth: 0.1, mode: "cover", top: 0, h: 0, on: false });
     });
+    /* 幕間: セクション内の進行度からヴェール段階を決定（ジャンプスクロール耐性） */
+    var kureEl = document.getElementById("kure");
+    if (kureEl) targets.push({ el: kureEl, depth: 0, mode: "kure", top: 0, h: 0, on: false });
 
     if (targets.length) {
       var vh = window.innerHeight;
 
+      var hostOf = function (t) {
+        return t.mode === "cover" ? t.el.closest(".bleed-photo--cover") : t.el;
+      };
       var measure = function () {
         vh = window.innerHeight;
         targets.forEach(function (t) {
-          var host = t.mode === "cover" ? t.el.closest(".bleed-photo--cover") : t.el;
+          var host = hostOf(t);
           var r = host.getBoundingClientRect();
           /* transformの影響を受けない素の位置に補正するため、現在の適用量を差し引く */
           t.top = r.top + window.scrollY - (t.cur || 0);
@@ -249,7 +244,12 @@
           var progress = (center - vh / 2) / vh;   /* 画面中央=0, 下端≈+1, 上端≈-1 */
           if (progress > 1.4) progress = 1.4;
           if (progress < -1.4) progress = -1.4;
-          if (t.mode === "cover") {
+          if (t.mode === "kure") {
+            /* セクション進行度 0..1 → ヴェール段階 */
+            var kp = (sy - t.top) / Math.max(1, t.h - vh);
+            var phase = kp > 0.62 ? "2" : (kp > 0.3 ? "1" : "0");
+            if (t.el.dataset.phase !== phase) t.el.dataset.phase = phase;
+          } else if (t.mode === "cover") {
             var ty = progress * t.depth * t.h;
             t.cur = 0;
             t.el.style.transform = "translate3d(0," + ty.toFixed(1) + "px,0) scale(1.12)";
@@ -268,10 +268,8 @@
 
       var pxIO = new IntersectionObserver(function (entries) {
         entries.forEach(function (e) {
-          var host = e.target;
           targets.forEach(function (t) {
-            var el = t.mode === "cover" ? t.el.closest(".bleed-photo--cover") : t.el;
-            if (el === host) t.on = e.isIntersecting;
+            if (hostOf(t) === e.target) t.on = e.isIntersecting;
           });
         });
         if (!running && targets.some(function (t) { return t.on; })) {
@@ -281,10 +279,7 @@
       }, { rootMargin: "12% 0% 12% 0%" });
 
       measure();
-      targets.forEach(function (t) {
-        var host = t.mode === "cover" ? t.el.closest(".bleed-photo--cover") : t.el;
-        pxIO.observe(host);
-      });
+      targets.forEach(function (t) { pxIO.observe(hostOf(t)); });
       window.addEventListener("resize", measure);
     }
   }

@@ -303,9 +303,6 @@ html.js .bleed-photo--cover img { will-change: transform; }
 }
 .kure__zone--paper { inset-block-start: 0; block-size: 62%; }
 .kure__zone--night { inset-block-start: 62%; block-size: 38%; }
-.kure__s { position: absolute; inset-inline: 0; block-size: 1px; pointer-events: none; }
-.kure__s--1 { inset-block-start: 36%; }
-.kure__s--2 { inset-block-start: 62%; }
 .kure__stage {
   position: sticky;
   top: 0;
