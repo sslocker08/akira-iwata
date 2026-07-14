@@ -143,17 +143,16 @@ html[data-act="night"] .bg__night { opacity: 1; }
 }
 .maku-title .ch { display: inline-block; }
 
-/* 章題わきの和文サブラベル（明朝の大題に対し、ゴシック小字で対比） */
+/* 章題わきの和文サブラベル（横書き・ゴシック小字で明朝の大題に対比） */
 .maku-sub {
-  writing-mode: vertical-rl;
   font-family: var(--font-ui);
   font-size: clamp(0.8125rem, 0.72rem + 0.42vw, 1.1rem);
   font-weight: 500;
-  letter-spacing: 0.32em;
+  letter-spacing: 0.14em;
   line-height: 1;
   color: var(--sumi-soft);
-  align-self: flex-start;
-  padding-block-start: 0.35em;
+  align-self: flex-end;
+  padding-block-end: 0.6em;
 }
 [data-theme="night"] .maku-sub { color: var(--night-soft); }
 
