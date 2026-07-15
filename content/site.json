@@ -183,6 +183,10 @@
       "blocks": [
         {
           "type": "bleed-cover",
+          "id": "4th-001"
+        },
+        {
+          "type": "bleed-cover",
           "id": "4th-002"
         },
         {
@@ -249,8 +253,7 @@
             ]
           }
         ]
-      },
-      "lead": "4th-001"
+      }
     },
     {
       "id": "act6",
