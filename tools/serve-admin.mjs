@@ -104,11 +104,14 @@ const server = createServer(async (req, res) => {
       const { message } = JSON.parse(await readBody(req).catch(() => "{}") || "{}");
       const msg = (message && String(message).slice(0, 200)) || "サイト更新";
       let log = "";
+      // 本番: Firebase Hosting へ公開
+      log += await run("firebase", ["deploy", "--only", "hosting"]);
+      // 控え: GitHub にも保存（コード変更の履歴・バックアップ用途。失敗しても公開は成功済みなので握りつぶす）
       try {
         log += await run("git", ["add", "-A"]);
         log += await run("git", ["commit", "-m", msg]);
-      } catch (e) { if (!/nothing to commit/.test(e.message)) throw e; log += "変更なし\n"; }
-      log += await run("git", ["push", "origin", "main"]);
+        log += await run("git", ["push", "origin", "main"]);
+      } catch (e) { if (!/nothing to commit/.test(e.message)) log += "\n(GitHubへの控え保存はスキップ: " + e.message.split("\n")[0] + ")"; else log += "変更なし\n"; }
       return json(res, 200, { ok: true, log });
     }
 
