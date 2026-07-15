@@ -73,19 +73,9 @@ function actSection(sec) {
   return out;
 }
 
-function kureSection(sec) {
-  return `<section class="kure" id="${sec.id}" aria-label="幕間">
-  <div class="kure__zone kure__zone--paper" data-actzone="paper" aria-hidden="true"></div>
-  <div class="kure__zone kure__zone--night" data-actzone="night" aria-hidden="true"></div>
-  <div class="kure__stage">
-    ${imgTag(sec.image)}
-    <div class="kure__veil" aria-hidden="true"></div>
-  </div>
-</section>`;
-}
-
 function profileSection(sec) {
   const p = sec.profile;
+  const lead = sec.lead ? bleed(sec.lead, true) + "\n  </div>\n\n  <div class=\"spine\">\n" : "";
   const groups = p.groups.map(g =>
     `        <h3>${esc(g.heading)}</h3>\n        <ul>\n` +
     g.items.map(it =>
@@ -95,6 +85,9 @@ function profileSection(sec) {
   return `<section class="act shirusu" id="${sec.id}" data-theme="${sec.theme}" data-actzone="${sec.theme}">
   <div class="spine">
 ${head(sec)}
+  </div>
+
+  ${lead}<div class="spine">
     <div class="shirusu__grid">
       <figure class="plate shirusu__photo" data-reveal>
         <button type="button" data-lb="${sec.photo}">
@@ -122,14 +115,12 @@ ${head(sec)}
 }
 
 function renderSection(sec) {
-  if (sec.type === "kure") return kureSection(sec);
   if (sec.type === "profile") return profileSection(sec);
   if (sec.type === "gallery") return gallerySection(sec);
   return actSection(sec);
 }
 
 const nav = site.sections
-  .filter(s => s.type !== "kure")
   .map((s, i) => `  <a href="#${s.id}" aria-label="${esc(s.title)}">${i + 1}</a>`)
   .join("\n");
 
@@ -207,7 +198,10 @@ ${main}
 writeFileSync(`${ROOT}/index.html`, html);
 
 // data.js（実行時の媒体グローバル: gallery と lightbox が参照）
-const dataLines = site.media.map(m =>
+// 表示順は site.gallery（明示的な並び）を優先。未指定分は末尾にmedia順で補う。
+const galleryOrder = site.gallery && site.gallery.length ? site.gallery : site.media.map(m => m.id);
+const orderedIds = [...galleryOrder, ...site.media.map(m => m.id).filter(id => !galleryOrder.includes(id))];
+const dataLines = orderedIds.map(id => M[id]).filter(Boolean).map(m =>
   "  " + JSON.stringify({ id: m.id, act: m.id.split("-")[0], n: +m.id.split("-")[1], w: m.w, h: m.h, color: m.color }, null, 0)
 ).join(",\n");
 writeFileSync(`${ROOT}/assets/js/data.js`,

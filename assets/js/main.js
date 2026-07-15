@@ -37,33 +37,15 @@
   });
 
   /* ---------- 幕ゾーン（紙⇄夜） ---------- */
-  var kure = document.getElementById("kure");
   var zoneIO = new IntersectionObserver(function (entries) {
     entries.forEach(function (e) {
       if (!e.isIntersecting) return;
       docEl.dataset.act = e.target.dataset.actzone;
-      /* 幕間のヴェール段階のフォールバック（reduced-motion時はこれが正） */
-      if (kure && e.target.parentElement === kure) {
-        kure.dataset.phase = e.target.dataset.actzone === "night" ? "2" : "1";
-      }
     });
   }, CENTER_BAND);
   document.querySelectorAll("[data-actzone]").forEach(function (el) {
     zoneIO.observe(el);
   });
-
-  /* ---------- 幕間 暮: 出現ズーム ---------- */
-  if (kure) {
-    var seenIO = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) {
-        if (e.isIntersecting) {
-          kure.classList.add("is-seen");
-          seenIO.disconnect();
-        }
-      });
-    }, { threshold: 0.05 });
-    seenIO.observe(kure);
-  }
 
   /* ---------- 収蔵庫グリッド生成（WORKS: data.js） ---------- */
   var kuraGrid = document.getElementById("kura-grid");
@@ -207,9 +189,6 @@
     document.querySelectorAll(".bleed-photo--cover img").forEach(function (img) {
       targets.push({ el: img, depth: 0.1, mode: "cover", top: 0, h: 0, on: false });
     });
-    /* 幕間: セクション内の進行度からヴェール段階を決定（ジャンプスクロール耐性） */
-    var kureEl = document.getElementById("kure");
-    if (kureEl) targets.push({ el: kureEl, depth: 0, mode: "kure", top: 0, h: 0, on: false });
 
     if (targets.length) {
       var vh = window.innerHeight;
@@ -239,12 +218,7 @@
           var progress = (center - vh / 2) / vh;   /* 画面中央=0, 下端≈+1, 上端≈-1 */
           if (progress > 1.4) progress = 1.4;
           if (progress < -1.4) progress = -1.4;
-          if (t.mode === "kure") {
-            /* セクション進行度 0..1 → ヴェール段階 */
-            var kp = (sy - t.top) / Math.max(1, t.h - vh);
-            var phase = kp > 0.62 ? "2" : (kp > 0.3 ? "1" : "0");
-            if (t.el.dataset.phase !== phase) t.el.dataset.phase = phase;
-          } else if (t.mode === "cover") {
+          if (t.mode === "cover") {
             var ty = progress * t.depth * t.h;
             t.cur = 0;
             t.el.style.transform = "translate3d(0," + ty.toFixed(1) + "px,0) scale(1.12)";

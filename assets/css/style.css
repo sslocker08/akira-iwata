@@ -274,46 +274,6 @@ html.js .bleed-photo--cover img { will-change: transform; }
   pointer-events: none;
 }
 
-/* ---------- 幕間（暗転ステージ） ---------- */
-.kure {
-  block-size: 180svh;
-  position: relative;
-  margin-block: var(--gap);
-}
-.kure__zone {
-  position: absolute;
-  inset-inline: 0;
-  pointer-events: none;
-}
-.kure__zone--paper { inset-block-start: 0; block-size: 62%; }
-.kure__zone--night { inset-block-start: 62%; block-size: 38%; }
-.kure__stage {
-  position: sticky;
-  top: 0;
-  block-size: 100svh;
-  overflow: clip;
-}
-.kure__stage img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transform: scale(1.06);
-  transition: transform 1400ms var(--ease-out);
-}
-.kure.is-seen .kure__stage img { transform: scale(1); }
-.kure__veil {
-  position: absolute;
-  inset: 0;
-  background: var(--night-bg);
-  opacity: 0;
-  transition: opacity 900ms var(--ease-out);
-  will-change: opacity;
-}
-.kure[data-phase="1"] .kure__veil { opacity: 0.45; }
-.kure[data-phase="2"] .kure__veil { opacity: 0.82; }
-
 /* ---------- 記（About） ---------- */
 .shirusu__grid {
   display: grid;
@@ -563,8 +523,6 @@ html.js .maku-title.is-in .ch {
   html.js .maku-title .ch { transform: none; }
   html.js .maku-title.is-in .ch { transition: opacity 150ms linear; transition-delay: 0ms; }
   .bg__night { transition-duration: 150ms; }
-  .kure__stage img { transform: none; transition: none; }
-  .kure__veil { transition-duration: 150ms; }
   .plate button img, .kura__cell img, .lb__img { transition: none; }
   html.js [data-px], html.js .bleed-photo--cover img { will-change: auto; }
 }

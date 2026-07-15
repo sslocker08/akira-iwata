@@ -76,6 +76,8 @@ const server = createServer(async (req, res) => {
       // media は act 順→番号順で整列
       const ord = { "0th": 0, "1st": 1, "2nd": 2, "3rd": 3, "4th": 4, "5th": 5, "ex": 6 };
       site.media.sort((a, b) => (ord[a.id.split("-")[0]] - ord[b.id.split("-")[0]]) || (+a.id.split("-")[1] - +b.id.split("-")[1]));
+      if (!site.gallery) site.gallery = [];
+      site.gallery.push(meta.id);
       await writeFile(siteJsonPath, JSON.stringify(site, null, 2) + "\n");
       await run(process.execPath, [join(ROOT, "tools", "build_site.mjs")]);
       return json(res, 200, { ok: true, media: meta });
@@ -85,10 +87,13 @@ const server = createServer(async (req, res) => {
       const { id } = JSON.parse(await readBody(req));
       const site = await loadSite();
       site.media = site.media.filter(m => m.id !== id);
+      if (site.gallery) site.gallery = site.gallery.filter(x => x !== id);
+      if (site.cover && site.cover.id === id) site.cover.id = "";
       for (const s of site.sections) {
         if (s.blocks) { for (const b of s.blocks) if (b.items) b.items = b.items.filter(x => x !== id);
           s.blocks = s.blocks.filter(b => !((b.type !== "row") && b.id === id) && !(b.type === "row" && b.items.length === 0)); }
         if (s.photo === id) s.photo = "";
+        if (s.lead === id) s.lead = "";
         if (s.image === id) s.image = "";
       }
       const act = id.split("-")[0];

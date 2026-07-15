@@ -5,13 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>作品集 — 編集</title>
 <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="8" fill="%231f6f4a"/></svg>'>
+<link rel="stylesheet" href="assets/css/style.css">
 <link rel="stylesheet" href="assets/admin/admin.css">
 </head>
 <body>
 <div id="boot" class="boot">
   <h1>作品集 編集画面</h1>
   <p class="boot__msg" id="bootMsg">読み込み中…</p>
-  <p class="boot__hint">この画面は <code>node tools/serve-admin.mjs</code> を起動した状態で <code>localhost:4321/admin.html</code> から開いてください。</p>
+  <p class="boot__hint">この画面は <code>start.command</code>（または <code>node tools/serve-admin.mjs</code>）を起動した状態で開いてください。</p>
 </div>
 
 <div id="app" hidden>
@@ -20,16 +21,21 @@
     <div class="topbar__actions">
       <a class="btn btn--ghost" href="index.html" target="_blank" rel="noopener">プレビュー↗</a>
       <button class="btn" id="btnSave">保存</button>
-      <button class="btn btn--primary" id="btnPublish">本番へ公開（akira-iwata.web.app）</button>
+      <button class="btn btn--primary" id="btnPublish">本番へ公開</button>
     </div>
     <div class="topbar__status" id="status" aria-live="polite"></div>
   </header>
 
-  <main class="wrap">
-    <section class="editor" id="editor"></section>
+  <div class="tray" id="tray" hidden>
+    <div class="tray__label">新しく追加した画像 <small>— ドラッグして好きな場所へ配置</small></div>
+    <div class="tray__items" id="trayItems"></div>
+  </div>
 
-    <aside class="side">
-      <div class="panel" id="selPanel" hidden>
+  <main class="wrap">
+    <section class="canvas" id="canvas"></section>
+
+    <aside class="side" id="selPanel" hidden>
+      <div class="panel">
         <h2>選択中の画像</h2>
         <div class="sel">
           <img id="selImg" alt="">
@@ -38,44 +44,16 @@
             <label class="fld"><span>説明文（alt）</span>
               <textarea id="selAlt" rows="2" placeholder="画像の説明（読み上げ・代替表示用）"></textarea>
             </label>
-            <div class="sel__btns">
-              <button class="btn btn--sm" id="selUnplace">配置から外す</button>
-              <button class="btn btn--sm btn--danger" id="selDelete">完全に削除</button>
-            </div>
+            <button class="btn btn--sm btn--danger" id="selDelete">完全に削除</button>
           </div>
         </div>
-      </div>
-
-      <div class="panel">
-        <h2>画像を追加</h2>
-        <label class="fld"><span>追加先セクション</span>
-          <select id="upAct">
-            <option value="1st">act.1 Tシャツイラスト</option>
-            <option value="2nd">act.2 和風デザイン</option>
-            <option value="3rd">act.3 グッズ</option>
-            <option value="4th">act.4（夜・演舞）</option>
-            <option value="ex">ギャラリーのみ（ex）</option>
-          </select>
-        </label>
-        <label class="drop" id="drop">
-          <input type="file" id="file" accept="image/*" hidden>
-          画像を選ぶ / ここにドロップ
-        </label>
-        <p class="hint">アップロードすると自動でサイズ最適化され、選んだセクションの末尾に新しい行として追加されます。</p>
-      </div>
-
-      <div class="panel">
-        <h2>ヘルプ</h2>
-        <ul class="help">
-          <li>画像は<b>ドラッグ</b>で行の中・行の間・セクション間を移動できます。</li>
-          <li>画像を<b>クリック</b>すると説明文の編集・削除ができます。</li>
-          <li>「行を追加」で新しい横一列を作れます。空の行は保存時に消えます。</li>
-          <li>編集したら<b>保存</b>、それを世に出すときだけ<b>本番へ公開</b>。</li>
-        </ul>
+        <button class="btn btn--sm btn--ghost" id="selClose" style="margin-top:.6rem">閉じる</button>
       </div>
     </aside>
   </main>
 </div>
+
+<input type="file" id="fileInput" accept="image/*" hidden multiple>
 
 <script src="assets/admin/admin.js" defer></script>
 </body>
