@@ -292,12 +292,14 @@ function renderCover() {
   sec.appendChild(head);
 
   const stage = div("ed-stage"); stage.dataset.theme = "paper";
+  const scale = div("ed-imgscale");
   const spine = div("spine");
   const grid = div("row");
   const loc = { field: "cover" };
   grid.appendChild(makeBlockImage(site.cover.id, loc, "plate"));
   spine.appendChild(grid);
-  stage.appendChild(spine);
+  scale.appendChild(spine);
+  stage.appendChild(scale);
   sec.appendChild(stage);
   return sec;
 }
@@ -330,18 +332,18 @@ function renderSection(s, si) {
 }
 
 function renderBlocksStage(s, si) {
+  const holder = div("");
   const spine = div("spine");
   s.blocks.forEach((b, bi) => {
     spine.appendChild(blockGap(si, bi));
     spine.appendChild(renderBlock(s, si, b, bi));
   });
   spine.appendChild(blockGap(si, s.blocks.length));
+  holder.appendChild(spine);
   const add = document.createElement("button");
   add.className = "ed-add-row"; add.textContent = "＋ 行を追加";
   add.addEventListener("click", () => { s.blocks.push({ type: "row", items: [] }); render(); });
-  const wrap = document.createDocumentFragment();
-  wrap.appendChild(spine); wrap.appendChild(add);
-  const holder = div(""); holder.appendChild(wrap);
+  holder.appendChild(add);
   return holder;
 }
 
@@ -375,7 +377,7 @@ function renderBlock(s, si, b, bi) {
   bar.append(handle, typeSel, del);
   wrap.appendChild(bar);
 
-  const content = div("");
+  const content = div("ed-imgscale");
   if (b.type === "row") content.appendChild(renderRow(si, bi, b));
   else if (b.type === "byobu") content.appendChild(renderByobuLike(si, bi, b));
   else content.appendChild(renderSingleFull(si, bi, b, b.type === "bleed-cover"));
@@ -482,11 +484,13 @@ function isOverLeftHalf(e, el) {
 
 /* ---------- プロフィール ---------- */
 function renderProfileStage(s, si) {
-  const frag = document.createDocumentFragment();
+  const outer = div("");
+  const scale = div("ed-imgscale");
+
   if (s.lead) {
     const fig = div("bleed bleed-photo bleed-photo--cover");
     fig.appendChild(makeBlockImage(s.lead, { si, field: "lead" }, "plain"));
-    frag.appendChild(fig);
+    scale.appendChild(fig);
   } else {
     const spine0 = div("spine");
     const dz = div("ed-row-tail"); dz.textContent = "＋ リード画像";
@@ -495,13 +499,15 @@ function renderProfileStage(s, si) {
     dz.addEventListener("dragleave", () => dz.classList.remove("drag-hot"));
     dz.addEventListener("drop", e => { e.preventDefault(); dz.classList.remove("drag-hot"); dropOnSingle({ si, field: "lead" }); });
     spine0.appendChild(dz);
-    frag.appendChild(spine0);
+    scale.appendChild(spine0);
   }
 
   const spine = div("spine");
   const grid = div("row");
   grid.appendChild(makeBlockImage(s.photo, { si, field: "photo" }, "plate"));
   spine.appendChild(grid);
+  scale.appendChild(spine);
+  outer.appendChild(scale);
 
   const p = s.profile;
   const pf = div("ed-profile");
@@ -512,7 +518,6 @@ function renderProfileStage(s, si) {
   pf.appendChild(line1);
 
   p.groups.forEach((g, gi) => {
-    const h = document.createElement("h3");
     const hi = input(g.heading, ""); hi.addEventListener("input", e => g.heading = e.target.value);
     pf.appendChild(labeledInput("見出し", hi));
     g.items.forEach((it, ii) => {
@@ -533,12 +538,7 @@ function renderProfileStage(s, si) {
     pf.appendChild(add);
   });
 
-  const holder = div("");
-  holder.appendChild(spine);
-  holder.appendChild(pf);
-  frag.appendChild(holder);
-
-  const outer = div(""); outer.appendChild(frag);
+  outer.appendChild(pf);
   return outer;
 }
 
