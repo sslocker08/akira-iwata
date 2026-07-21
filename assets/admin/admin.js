@@ -1,33 +1,126 @@
 "use strict";
-/* 作品集 ローカル編集画面。tools/serve-admin.mjs（localhost:4321）と通信する。
+/* 作品集 編集画面（ブラウザ完結版）。
+   サーバー不要 — GitHub リポジトリ（sslocker08/akira-iwata）を正本として直接読み書きする。
+   ・読み込み: draft ブランチ（無ければ main）の content/site.json
+   ・保存    : draft ブランチへコミット（本番には影響しない下書き）
+   ・公開    : draft の内容を main へ反映 → GitHub Actions が自動で build + Firebase デプロイ
+   ・画像    : ブラウザ内で Canvas リサイズ（works ≤1800px / thumbs ≤400px）。原本は自動ダウンロードで手元に保存
+   認証は URL の #k=<キー> で受け取り localStorage に保存する。キーが無いと一切書き込めない。
    すべてのブロック（行/全幅/全画面/屏風）・単独スロット（表紙/リード/プロフィール写真）・
    ギャラリーを、同一のドラッグ&ドロップ機構で扱う。 */
 
-const $ = s => document.querySelector(s);
-const api = (path, opts) => fetch(path, opts).then(async r => {
-  const t = await r.text();
-  let j = {}; try { j = t ? JSON.parse(t) : {}; } catch {}
-  if (!r.ok) throw new Error(j.error || r.status);
-  return j;
-});
-const thumb = id => `img/thumbs/${id}.jpg`;
-const work = id => `img/works/${id}.jpg`;
+import { buildHtml, buildDataJs } from "./build-core.mjs";
 
+/* ---------- 設定 ---------- */
+const OWNER = "sslocker08", REPO = "akira-iwata";
+const SITE_URL = "https://akira-iwata.web.app";
+const API = `https://api.github.com/repos/${OWNER}/${REPO}`;
+const TOKEN_KEY = "akira-admin-token";
+const RAW = (sha, path) => `https://raw.githubusercontent.com/${OWNER}/${REPO}/${sha}/${path}`;
+
+const $ = s => document.querySelector(s);
+
+let token = "";
 let site = null;
-let sel = null;      // 現在選択中の画像id（説明文編集パネル用）
-let selLoc = null;
-let tray = [];        // アップロード直後、未配置の画像id一覧
+let headSha = null;   // 表示中コンテンツのコミットSHA（画像URLの基準）
+let sel = null;       // 現在選択中の画像id（説明文編集パネル用）
+let tray = [];        // 追加直後、未配置の画像id一覧
 let drag = null;      // 進行中のドラッグのペイロード
 
-/* ---------- 起動 ---------- */
-(async function boot() {
-  try { site = await api("/api/site"); }
-  catch (e) {
-    document.getElementById("boot").classList.add("error");
-    $("#bootMsg").textContent = "ヘルパに接続できません（" + e.message + "）";
-    return;
+let savedSnapshot = "";              // 最後に保存した site のJSON（dirty判定用）
+const pending = new Map();           // path -> {b64, sha?} 未コミットの新画像
+const deletions = new Set();         // 次回保存時にリポジトリから消すパス
+const committedIds = new Set();      // リポジトリに画像ファイルが存在するid
+const blobUrls = new Map();          // path -> objectURL（このセッションで追加した画像の表示用）
+
+const thumb = id => blobUrls.get(`img/thumbs/${id}.jpg`) || RAW(headSha, `img/thumbs/${id}.jpg`);
+const work = id => blobUrls.get(`img/works/${id}.jpg`) || RAW(headSha, `img/works/${id}.jpg`);
+
+/* ---------- GitHub API ---------- */
+async function gh(path, opts = {}) {
+  const r = await fetch(API + path, {
+    ...opts,
+    headers: {
+      "Authorization": "Bearer " + token,
+      "Accept": "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      ...(opts.headers || {}),
+    },
+  });
+  if (r.status === 401) throw new Error("編集キーが無効か期限切れです。作者に新しいURLをもらってください");
+  if (!r.ok && r.status !== 404) {
+    const j = await r.json().catch(() => ({}));
+    throw new Error(j.message || "GitHub APIエラー " + r.status);
   }
+  return r;
+}
+async function refSha(branch) {
+  const r = await gh(`/git/ref/${encodeURIComponent("heads/" + branch)}`);
+  if (r.status === 404) return null;
+  return (await r.json()).object.sha;
+}
+async function commitOf(sha) { return (await gh(`/git/commits/${sha}`)).json(); }
+const utf8FromB64 = b64 => new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\s/g, "")), c => c.charCodeAt(0)));
+
+async function loadSiteAt(sha) {
+  const r = await gh(`/contents/content/site.json?ref=${sha}`);
+  if (r.status === 404) throw new Error("content/site.json が見つかりません");
+  return JSON.parse(utf8FromB64((await r.json()).content));
+}
+
+/* ---------- 起動 ---------- */
+function takeToken() {
+  const m = location.hash.match(/[#&]k=([^&]+)/);
+  if (m) {
+    localStorage.setItem(TOKEN_KEY, decodeURIComponent(m[1]));
+    history.replaceState(null, "", location.pathname + location.search);
+  }
+  return localStorage.getItem(TOKEN_KEY) || "";
+}
+
+function showKeyScreen(msg) {
+  $("#boot").classList.add("error");
+  $("#bootMsg").textContent = msg;
+  $("#keyForm").hidden = false;
+}
+
+(async function boot() {
+  token = takeToken();
+  $("#keySave").addEventListener("click", () => {
+    const v = $("#keyInput").value.trim();
+    if (!v) return;
+    localStorage.setItem(TOKEN_KEY, v);
+    location.reload();
+  });
+  if (!token) return showKeyScreen("編集キーがありません。作者にもらった編集用URLから開いてください。");
+
+  try {
+    // キーの検証（このリポジトリへの書き込み権限があるか）
+    const repo = await (await gh("")).json();
+    if (!repo.permissions || !repo.permissions.push) {
+      return showKeyScreen("このキーには保存の権限がありません。作者に新しいURLをもらってください。");
+    }
+    const mainSha = await refSha("main");
+    let draftSha = await refSha("draft");
+    if (draftSha && draftSha !== mainSha) {
+      // draft が main より古いだけ（固有のコミットが無い）なら main に追従させる
+      const cmp = await (await gh(`/compare/main...draft`)).json();
+      if (cmp.status === "behind" || cmp.status === "identical") {
+        await gh(`/git/refs/${encodeURIComponent("heads/draft")}`, { method: "PATCH", body: JSON.stringify({ sha: mainSha, force: true }) });
+        draftSha = mainSha;
+      } else if (cmp.status === "diverged") {
+        status("※本番側にも別の更新があります。「本番へ公開」するとこの画面の内容で上書きされます", "err");
+      }
+    }
+    headSha = draftSha || mainSha;
+    site = await loadSiteAt(headSha);
+  } catch (e) {
+    return showKeyScreen("読み込みに失敗しました（" + e.message + "）");
+  }
+
   if (!site.gallery) site.gallery = site.media.map(m => m.id);
+  site.media.forEach(m => committedIds.add(m.id));
+  savedSnapshot = JSON.stringify(site);
   $("#boot").hidden = true;
   $("#app").hidden = false;
   wireGlobal();
@@ -36,6 +129,7 @@ let drag = null;      // 進行中のドラッグのペイロード
 
 function status(msg, cls = "") { const s = $("#status"); s.textContent = msg; s.className = "topbar__status " + cls; }
 const mediaOf = id => site.media.find(m => m.id === id);
+const isDirty = () => pending.size > 0 || deletions.size > 0 || JSON.stringify(site) !== savedSnapshot;
 
 /* ---------- データアクセス（block / field 共通ロケータ） ---------- */
 // loc: {field:'cover'} | {si, field:'lead'|'photo'} | {si, bi, ii?}
@@ -61,9 +155,11 @@ function isRowSlot(loc) { return loc.bi != null && loc.ii != null; }
 function wireGlobal() {
   $("#btnSave").addEventListener("click", save);
   $("#btnPublish").addEventListener("click", publish);
+  $("#btnPreview").addEventListener("click", openPreview);
   $("#selAlt").addEventListener("input", e => { if (sel) { const m = mediaOf(sel); if (m) m.alt = e.target.value; } });
   $("#selDelete").addEventListener("click", deleteSelected);
   $("#selClose").addEventListener("click", closeSelPanel);
+  window.addEventListener("beforeunload", e => { if (isDirty()) { e.preventDefault(); e.returnValue = ""; } });
 
   const fi = $("#fileInput");
   document.addEventListener("dragover", e => { if ([...e.dataTransfer.types].includes("Files")) e.preventDefault(); });
@@ -76,32 +172,162 @@ function wireGlobal() {
   fi.addEventListener("change", () => { [...fi.files].forEach(uploadFile); fi.value = ""; });
 }
 
-async function save() {
-  pruneEmptyRows();
-  try { status("保存中…"); await api("/api/save", { method: "POST", body: JSON.stringify(site) }); status("保存しました", "ok"); }
-  catch (e) { status("保存に失敗: " + e.message, "err"); }
+/* ---------- 保存（draftブランチへコミット） ---------- */
+async function commitSnapshot(parentSha, message) {
+  const entries = [];
+  for (const [path, p] of pending) {
+    if (!p.sha) {
+      const r = await (await gh("/git/blobs", { method: "POST", body: JSON.stringify({ content: p.b64, encoding: "base64" }) })).json();
+      p.sha = r.sha;
+    }
+    entries.push({ path, mode: "100644", type: "blob", sha: p.sha });
+  }
+  for (const path of deletions) entries.push({ path, mode: "100644", type: "blob", sha: null });
+  entries.push({ path: "content/site.json", mode: "100644", type: "blob", content: JSON.stringify(site, null, 2) + "\n" });
+  const parent = await commitOf(parentSha);
+  const tree = await (await gh("/git/trees", { method: "POST", body: JSON.stringify({ base_tree: parent.tree.sha, tree: entries }) })).json();
+  const commit = await (await gh("/git/commits", { method: "POST", body: JSON.stringify({ message, tree: tree.sha, parents: [parentSha] }) })).json();
+  return commit.sha;
 }
+
+async function ensureDraft() {
+  let draft = await refSha("draft");
+  if (!draft) {
+    const main = await refSha("main");
+    await gh("/git/refs", { method: "POST", body: JSON.stringify({ ref: "refs/heads/draft", sha: main }) });
+    draft = main;
+  }
+  return draft;
+}
+
+async function save() {
+  pruneEmptyBlocks();
+  try {
+    status("保存中…");
+    const draft = await ensureDraft();
+    const newSha = await commitSnapshot(draft, "下書きを保存");
+    await gh(`/git/refs/${encodeURIComponent("heads/draft")}`, { method: "PATCH", body: JSON.stringify({ sha: newSha }) });
+    headSha = newSha;
+    for (const m of site.media) committedIds.add(m.id);
+    pending.clear(); deletions.clear();
+    savedSnapshot = JSON.stringify(site);
+    status("保存しました（下書き。本番には未反映）", "ok");
+    return true;
+  } catch (e) { status("保存に失敗: " + e.message, "err"); return false; }
+}
+
 async function publish() {
   if (!confirm("現在の内容を本番サイトへ公開します。よろしいですか？")) return;
-  pruneEmptyRows();
+  if (!await save()) return;
   try {
-    status("公開中… (保存→本番反映)");
-    await api("/api/save", { method: "POST", body: JSON.stringify(site) });
-    const r = await api("/api/publish", { method: "POST", body: JSON.stringify({ message: "作品集を更新" }) });
-    status("公開しました。数分で本番に反映されます。", "ok");
-    console.log(r.log);
+    status("公開中…");
+    const draft = await refSha("draft");
+    const main = await refSha("main");
+    const [dc, mc] = await Promise.all([commitOf(draft), commitOf(main)]);
+    if (dc.tree.sha === mc.tree.sha) { status("変更はありません（本番はすでに最新です）", "ok"); return; }
+    const commit = await (await gh("/git/commits", { method: "POST", body: JSON.stringify({ message: "作品集を更新（本番へ公開）", tree: dc.tree.sha, parents: [main] }) })).json();
+    await gh(`/git/refs/${encodeURIComponent("heads/main")}`, { method: "PATCH", body: JSON.stringify({ sha: commit.sha }) });
+    await gh(`/git/refs/${encodeURIComponent("heads/draft")}`, { method: "PATCH", body: JSON.stringify({ sha: commit.sha, force: true }) });
+    headSha = commit.sha;
+    status("公開しました。1〜2分ほどで本番サイトに反映されます。", "ok");
   } catch (e) { status("公開に失敗: " + e.message, "err"); }
+}
+
+/* ---------- プレビュー（build-core でその場生成） ---------- */
+function openPreview() {
+  pruneEmptyBlocks();
+  try {
+    let html = buildHtml(site);
+    html = html.replace("<head>", `<head>\n<base href="${SITE_URL}/">`);
+    // 実行時参照（ギャラリー/ライトボックス）: data.js をこの場の内容でインライン化し、画像URLの差し替え表を渡す
+    const previewSrc = {};
+    for (const m of site.media) {
+      previewSrc[`img/works/${m.id}.jpg`] = work(m.id);
+      previewSrc[`img/thumbs/${m.id}.jpg`] = thumb(m.id);
+    }
+    html = html.replace('<script defer src="assets/js/data.js"></script>',
+      "<script>window.PREVIEW_SRC = " + JSON.stringify(previewSrc) + ";\n" + buildDataJs(site) + "</script>");
+    // 静的HTML中の画像も同じ差し替え表で置換
+    for (const [path, url] of Object.entries(previewSrc)) html = html.split(`src="${path}"`).join(`src="${url}"`);
+    const w = window.open("", "_blank");
+    if (!w) return status("プレビューを開けません（ポップアップがブロックされています）", "err");
+    w.document.write(html);
+    w.document.close();
+  } catch (e) { status("プレビュー生成に失敗: " + e.message, "err"); }
+}
+
+/* ---------- 画像取り込み（ブラウザ内でリサイズ・sips不要） ---------- */
+async function loadImageEl(file) {
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.src = url;
+  try { await img.decode(); }
+  catch { URL.revokeObjectURL(url); throw new Error("この画像形式を読み込めません（JPEGかPNGでお試しください）"); }
+  return img;
+}
+function scaledCanvas(img, maxDim) {
+  const w0 = img.naturalWidth, h0 = img.naturalHeight;
+  const scale = Math.min(1, maxDim / Math.max(w0, h0));
+  const c = document.createElement("canvas");
+  c.width = Math.max(1, Math.round(w0 * scale));
+  c.height = Math.max(1, Math.round(h0 * scale));
+  c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+  return c;
+}
+const toJpeg = (canvas, q) => new Promise((res, rej) =>
+  canvas.toBlob(b => b ? res(b) : rej(new Error("画像の変換に失敗しました")), "image/jpeg", q));
+const b64Of = blob => new Promise((res, rej) => {
+  const fr = new FileReader();
+  fr.onload = () => res(String(fr.result).split(",")[1]);
+  fr.onerror = rej;
+  fr.readAsDataURL(blob);
+});
+function avgColor(canvas) {
+  const c = document.createElement("canvas");
+  c.width = c.height = 1;
+  const ctx = c.getContext("2d");
+  ctx.drawImage(canvas, 0, 0, 1, 1);
+  const d = ctx.getImageData(0, 0, 1, 1).data;
+  return `rgb(${d[0]} ${d[1]} ${d[2]})`;
+}
+function nextId(act) {
+  const nums = site.media.filter(m => m.id.startsWith(act + "-")).map(m => +m.id.split("-")[1]);
+  return `${act}-${String((nums.length ? Math.max(...nums) : 0) + 1).padStart(3, "0")}`;
+}
+function downloadOriginal(file, id) {
+  try {
+    const ext = (file.name.match(/\.[A-Za-z0-9]+$/) || [".jpg"])[0];
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(file);
+    a.download = `${id}-原本${ext}`;
+    a.click();
+  } catch { /* 原本保存は補助機能。失敗しても取り込みは続行 */ }
 }
 
 async function uploadFile(f, act = "ex") {
   try {
-    status("画像を最適化してアップロード中…");
-    const buf = await f.arrayBuffer();
-    const r = await api(`/api/upload?act=${act}`, { method: "POST", body: buf });
-    site = await api("/api/site");
-    if (!site.gallery) site.gallery = site.media.map(m => m.id);
-    tray.push(r.media.id);
-    status(`追加しました（${r.media.id}）— ドラッグして配置してください`, "ok");
+    status("画像を取り込み中…");
+    const img = await loadImageEl(f);
+    const workC = scaledCanvas(img, 1800);
+    const thumbC = scaledCanvas(img, 400);
+    const [workBlob, thumbBlob] = await Promise.all([toJpeg(workC, 0.8), toJpeg(thumbC, 0.72)]);
+    const id = nextId(act);
+    const meta = { id, w: workC.width, h: workC.height, color: avgColor(thumbC), alt: "" };
+    site.media.push(meta);
+    const ord = { "0th": 0, "1st": 1, "2nd": 2, "3rd": 3, "4th": 4, "5th": 5, "ex": 6 };
+    site.media.sort((a, b) => (ord[a.id.split("-")[0]] - ord[b.id.split("-")[0]]) || (+a.id.split("-")[1] - +b.id.split("-")[1]));
+    if (!site.gallery) site.gallery = [];
+    site.gallery.push(id);
+    // 削除済みidの再採番で同一パスになった場合、削除予約より新規blobを優先する
+    deletions.delete(`img/works/${id}.jpg`);
+    deletions.delete(`img/thumbs/${id}.jpg`);
+    pending.set(`img/works/${id}.jpg`, { b64: await b64Of(workBlob) });
+    pending.set(`img/thumbs/${id}.jpg`, { b64: await b64Of(thumbBlob) });
+    blobUrls.set(`img/works/${id}.jpg`, URL.createObjectURL(workBlob));
+    blobUrls.set(`img/thumbs/${id}.jpg`, URL.createObjectURL(thumbBlob));
+    downloadOriginal(f, id);
+    tray.push(id);
+    status(`追加しました（${id}）— ドラッグして配置し、最後に「保存」してください`, "ok");
     render();
   } catch (e) { status("追加に失敗: " + e.message, "err"); }
 }
@@ -116,18 +342,32 @@ function selectItem(id) {
   $("#selAlt").value = m.alt || "";
 }
 function closeSelPanel() { sel = null; $("#selPanel").hidden = true; }
-async function deleteSelected() {
+function deleteSelected() {
   if (!sel) return;
   if (!confirm(`${sel} を完全に削除します（画像ファイルも消えます）。よろしいですか？`)) return;
-  try {
-    status("削除中…");
-    await api("/api/delete-image", { method: "POST", body: JSON.stringify({ id: sel }) });
-    site = await api("/api/site");
-    if (!site.gallery) site.gallery = site.media.map(m => m.id);
-    tray = tray.filter(x => x !== sel);
-    closeSelPanel();
-    status("削除しました", "ok"); render();
-  } catch (e) { status("削除に失敗: " + e.message, "err"); }
+  const id = sel;
+  site.media = site.media.filter(m => m.id !== id);
+  if (site.gallery) site.gallery = site.gallery.filter(x => x !== id);
+  if (site.cover && site.cover.id === id) site.cover.id = "";
+  for (const s of site.sections) {
+    if (s.blocks) {
+      for (const b of s.blocks) if (b.items) b.items = b.items.filter(x => x !== id);
+      s.blocks = s.blocks.filter(b => !((b.type !== "row") && b.id === id) && !(b.type === "row" && b.items.length === 0));
+    }
+    if (s.photo === id) s.photo = "";
+    if (s.lead === id) s.lead = "";
+    if (s.image === id) s.image = "";
+  }
+  for (const path of [`img/works/${id}.jpg`, `img/thumbs/${id}.jpg`]) {
+    if (pending.has(path)) pending.delete(path);
+    else if (committedIds.has(id)) deletions.add(path);
+    if (blobUrls.has(path)) { URL.revokeObjectURL(blobUrls.get(path)); blobUrls.delete(path); }
+  }
+  committedIds.delete(id);
+  tray = tray.filter(x => x !== id);
+  closeSelPanel();
+  status("削除しました（「保存」で確定します）", "ok");
+  render();
 }
 
 /* =========================================================
@@ -611,6 +851,9 @@ function labeledInput(labelText, node) {
   w.append(s, node);
   return w;
 }
-function pruneEmptyRows() {
-  site.sections.forEach(s => { if (s.blocks) s.blocks = s.blocks.filter(b => b.type !== "row" || b.items.length); });
+// 空の行と、画像未設定の単独ブロック（全幅/全画面/屏風）を保存前に取り除く
+function pruneEmptyBlocks() {
+  site.sections.forEach(s => {
+    if (s.blocks) s.blocks = s.blocks.filter(b => b.type === "row" ? b.items.length : b.id);
+  });
 }

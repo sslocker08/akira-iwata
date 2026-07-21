@@ -6,8 +6,6 @@
       ".firebaserc",
       "**/.*",
       "**/node_modules/**",
-      "admin.html",
-      "assets/admin/**",
       "tools/**",
       "content/**",
       "image/**",

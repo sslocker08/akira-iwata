@@ -12,14 +12,19 @@
 <div id="boot" class="boot">
   <h1>作品集 編集画面</h1>
   <p class="boot__msg" id="bootMsg">読み込み中…</p>
-  <p class="boot__hint">この画面は <code>start.command</code>（または <code>node tools/serve-admin.mjs</code>）を起動した状態で開いてください。</p>
+  <div id="keyForm" hidden>
+    <p class="boot__hint">作者にもらった<b>編集用URL</b>（<code>…admin.html#k=…</code>）から開くと自動で設定されます。<br>
+    キーの文字列だけ持っている場合は、下に貼り付けてください。</p>
+    <p><input id="keyInput" type="password" placeholder="編集キーを貼り付け" style="width:16rem">
+    <button class="btn" id="keySave">設定</button></p>
+  </div>
 </div>
 
 <div id="app" hidden>
   <header class="topbar">
     <div class="topbar__title">作品集 編集</div>
     <div class="topbar__actions">
-      <a class="btn btn--ghost" href="index.html" target="_blank" rel="noopener">プレビュー↗</a>
+      <button class="btn btn--ghost" id="btnPreview" type="button">プレビュー↗</button>
       <button class="btn" id="btnSave">保存</button>
       <button class="btn btn--primary" id="btnPublish">本番へ公開</button>
     </div>
@@ -55,6 +60,6 @@
 
 <input type="file" id="fileInput" accept="image/*" hidden multiple>
 
-<script src="assets/admin/admin.js" defer></script>
+<script src="assets/admin/admin.js" type="module"></script>
 </body>
 </html>
