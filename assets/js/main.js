@@ -59,7 +59,8 @@
       cell.dataset.lb = w.id;
       cell.setAttribute("aria-label", no);
       var img = document.createElement("img");
-      img.src = "img/thumbs/" + w.id + ".jpg";
+      var tp = "img/thumbs/" + w.id + ".jpg";
+      img.src = (window.PREVIEW_SRC || {})[tp] || tp; // PREVIEW_SRC: 編集画面プレビューが未公開画像を差し替えるためのフック（本番では未定義）
       img.alt = "";
       img.loading = "lazy";
       img.decoding = "async";
@@ -93,7 +94,7 @@
     var current = 0;
     var opener = null;
 
-    var srcOf = function (w) { return "img/works/" + w.id + ".jpg"; };
+    var srcOf = function (w) { var p = "img/works/" + w.id + ".jpg"; return (window.PREVIEW_SRC || {})[p] || p; };
 
     var show = function (i) {
       current = (i + WORKS.length) % WORKS.length;

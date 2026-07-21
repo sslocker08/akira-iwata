@@ -1,0 +1,51 @@
+# main が更新されたら site.json からサイトを再生成し、Firebase Hosting へ自動公開する。
+# 編集画面（admin.html）は content/site.json と画像だけをコミットする——
+# index.html / data.js の生成はここ（CI）が担うので、編集する端末に Node.js は不要。
+#
+# 必要な準備（リポジトリオーナーが一度だけ・詳細は ADMIN.md「公開の仕組みとセットアップ」）:
+#   Settings → Secrets and variables → Actions → New repository secret
+#   名前: FIREBASE_SERVICE_ACCOUNT / 値: Firebase サービスアカウントの JSON キー
+name: build-deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: サイト生成（site.json → index.html / data.js）
+        run: node tools/build_site.mjs
+
+      - name: 生成物を main にコミット（変更がある場合のみ）
+        run: |
+          if ! git diff --quiet -- index.html assets/js/data.js; then
+            git config user.name "site-builder[bot]"
+            git config user.email "site-builder@users.noreply.github.com"
+            git add index.html assets/js/data.js
+            git commit -m "サイト再生成 [skip ci]"
+            git push origin main
+          fi
+
+      - name: Firebase Hosting へ公開
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: akira-iwata
+          channelId: live
